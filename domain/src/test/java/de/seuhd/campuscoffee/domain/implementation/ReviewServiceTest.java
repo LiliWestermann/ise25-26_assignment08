@@ -173,4 +173,47 @@ public class ReviewServiceTest {
         // then
         assertTrue(updatedReview.approved());
     }
+
+    @Test
+    void testUpsertNewReviewSuccess() {
+        // given
+        Review newReview = TestFixtures.getReviewFixtures().getFirst().toBuilder()
+                .id(null)
+                .build();
+        Pos pos = newReview.pos();
+        User author = newReview.author();
+        assertNotNull(pos.getId());
+        when(posDataService.getById(pos.getId())).thenReturn(pos);
+        when(reviewDataService.filter(pos, author)).thenReturn(List.of());
+        when(reviewDataService.upsert(newReview)).thenAnswer(invocation -> {
+            Review reviewToSave = invocation.getArgument(0);
+            return reviewToSave.toBuilder().id(1L).build();
+        });
+
+        // when
+        Review savedReview = reviewService.upsert(newReview);
+
+        // then
+        verify(posDataService).getById(pos.getId());
+        verify(reviewDataService).filter(pos, author);
+        verify(reviewDataService).upsert(newReview);
+        assertNotNull(savedReview.getId());
+    }
+
+    @Test
+    void testUpsertDuplicateReviewException() {
+        // given
+        Review duplicateReview = TestFixtures.getReviewFixtures().getFirst();
+        Pos pos = duplicateReview.pos();
+        User author = duplicateReview.author();
+        assertNotNull(pos.getId());
+        when(posDataService.getById(pos.getId())).thenReturn(pos);
+        when(reviewDataService.filter(pos, author)).thenReturn(List.of(duplicateReview));
+
+        // when, then
+        assertThrows(ValidationException.class, () -> reviewService.upsert(duplicateReview));
+        verify(posDataService).getById(pos.getId());
+        verify(reviewDataService).filter(pos, author);
+    }
+
 }
